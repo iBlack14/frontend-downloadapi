@@ -7,8 +7,6 @@ import { Download, Check, AlertCircle, RefreshCw, Link, FileVideo, Monitor, Smar
 const API_BASE = "https://videoapi-copia-production.up.railway.app"
 
 function App() {
-  console.log("[v0] App component is rendering")
-
   const [downloads, setDownloads] = useState([])
   const [url, setUrl] = useState("")
   const [loading, setLoading] = useState(false)
@@ -20,7 +18,6 @@ function App() {
 
   // Cargar app → traer historial
   useEffect(() => {
-    console.log("[v0] useEffect running - fetching downloads")
     obtenerDescargas()
   }, [])
 
@@ -224,12 +221,8 @@ function App() {
     setSelectedFormat("")
   }
 
-  console.log("[v0] About to render App component")
-
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 text-slate-900">
-      {console.log("[v0] Rendering main div")}
-
       <div className="fixed inset-0 overflow-hidden pointer-events-none opacity-30">
         <div
           className="absolute inset-0"
@@ -491,5 +484,4 @@ function App() {
   )
 }
 
-console.log("[v0] App component defined, about to export")
 export default App
