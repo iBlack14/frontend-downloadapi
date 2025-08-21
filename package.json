@@ -3,10 +3,10 @@
   "version": "1.0.0",
   "private": true,
   "scripts": {
-    "dev": "vite",
-    "build": "vite build",
-    "preview": "vite preview",
-    "start": "vite"
+    "dev": "npx vite",
+    "build": "npx vite build",
+    "preview": "npx vite preview",
+    "start": "npx vite"
   },
   "dependencies": {
     "lucide-react": "^0.540.0",
@@ -19,5 +19,8 @@
     "postcss": "^8.5.6",
     "tailwindcss": "^3.4.17",
     "vite": "^5.4.2"
+  },
+  "engines": {
+    "node": ">=18"
   }
 }
