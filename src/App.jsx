@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { Download, Play, Check, AlertCircle, Trash2, RefreshCw, Link, FileVideo } from "lucide-react";
+import { Download, Play, Check, AlertCircle, Trash2, RefreshCw, Link, FileVideo, ChevronDown, Monitor, Smartphone, Video } from "lucide-react";
 
 // API en producción
 const API_BASE = "https://videoapi-copia-production.up.railway.app";
@@ -8,7 +8,11 @@ function App() {
   const [downloads, setDownloads] = useState([]);
   const [url, setUrl] = useState("");
   const [loading, setLoading] = useState(false);
+  const [loadingFormats, setLoadingFormats] = useState(false);
   const [notification, setNotification] = useState(null);
+  const [availableFormats, setAvailableFormats] = useState(null);
+  const [videoTitle, setVideoTitle] = useState("");
+  const [selectedFormat, setSelectedFormat] = useState("");
 
   // Cargar app → traer historial
   useEffect(() => {
@@ -34,25 +38,73 @@ function App() {
     }
   };
 
-  // Iniciar nueva descarga
-  const manejarDescarga = async () => {
+  // Obtener formatos disponibles
+  const obtenerFormatos = async () => {
     if (!url.trim()) return;
+    
+    setLoadingFormats(true);
+    try {
+      const encodedUrl = encodeURIComponent(url);
+      const response = await fetch(`${API_BASE}/formats/${encodedUrl}`);
+      
+      if (!response.ok) throw new Error("Error al obtener formatos");
+      
+      const data = await response.json();
+      setAvailableFormats(data.formats);
+      setVideoTitle(data.title);
+      
+      // Seleccionar automáticamente el primer formato como predeterminado
+      if (data.formats && data.formats.length > 0) {
+        setSelectedFormat(data.formats[0].format_id);
+      }
+      
+      mostrarNotificacion("Formatos cargados exitosamente", 'success');
+    } catch (error) {
+      console.error("Error:", error);
+      mostrarNotificacion("Error al obtener los formatos del video", 'error');
+      setAvailableFormats(null);
+      setVideoTitle("");
+    } finally {
+      setLoadingFormats(false);
+    }
+  };
+
+  // Iniciar nueva descarga con formato específico
+  const manejarDescarga = async () => {
+    if (!url.trim() || !selectedFormat) return;
+    
     setLoading(true);
     try {
       const response = await fetch(`${API_BASE}/download`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ url }),
+        body: JSON.stringify({ 
+          url, 
+          format: selectedFormat 
+        }),
       });
+      
       if (!response.ok) throw new Error("Error en la descarga");
       const data = await response.json();
 
       // Nuevo elemento con estado inicial
       setDownloads((prev) => [
-        { id: data.download_id, url, status: "pending", progress: 0 },
+        { 
+          id: data.download_id, 
+          url, 
+          title: videoTitle || "Video",
+          status: "pending", 
+          progress: 0,
+          format: selectedFormat
+        },
         ...prev,
       ]);
+      
+      // Limpiar formulario
       setUrl("");
+      setAvailableFormats(null);
+      setVideoTitle("");
+      setSelectedFormat("");
 
       // Comenzar a monitorear este download_id
       monitorearEstado(data.download_id);
@@ -141,11 +193,32 @@ function App() {
     }
   };
 
+  // Obtener ícono de calidad
+  const obtenerIconoCalidad = (resolution) => {
+    if (!resolution) return <Video className="w-4 h-4" />;
+    
+    const height = parseInt(resolution.split('x')[1]);
+    if (height >= 1080) return <Monitor className="w-4 h-4 text-green-400" />;
+    if (height >= 720) return <Monitor className="w-4 h-4 text-blue-400" />;
+    return <Smartphone className="w-4 h-4 text-yellow-400" />;
+  };
+
   // Manejar presión de tecla Enter
   const manejarTecla = (e) => {
     if (e.key === 'Enter') {
-      manejarDescarga();
+      if (!availableFormats) {
+        obtenerFormatos();
+      } else if (selectedFormat) {
+        manejarDescarga();
+      }
     }
+  };
+
+  // Cancelar selección de formatos
+  const cancelarSeleccion = () => {
+    setAvailableFormats(null);
+    setVideoTitle("");
+    setSelectedFormat("");
   };
 
   return (
@@ -203,26 +276,108 @@ function App() {
                   className="w-full pl-12 pr-4 py-4 bg-white/20 border border-white/30 rounded-xl text-white placeholder-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-transparent transition-all"
                 />
               </div>
-              <button
-                onClick={manejarDescarga}
-                disabled={loading || !url.trim()}
-                className="px-8 py-4 bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700 disabled:opacity-50 disabled:cursor-not-allowed rounded-xl font-semibold transition-all duration-200 shadow-lg hover:shadow-xl flex items-center gap-2 min-w-[140px] justify-center"
-              >
-                {loading ? (
-                  <>
-                    <RefreshCw className="w-5 h-5 animate-spin" />
-                    Descargando...
-                  </>
-                ) : (
-                  <>
-                    <Download className="w-5 h-5" />
-                    Descargar
-                  </>
-                )}
-              </button>
+              
+              {!availableFormats ? (
+                <button
+                  onClick={obtenerFormatos}
+                  disabled={loadingFormats || !url.trim()}
+                  className="px-8 py-4 bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700 disabled:opacity-50 disabled:cursor-not-allowed rounded-xl font-semibold transition-all duration-200 shadow-lg hover:shadow-xl flex items-center gap-2 min-w-[140px] justify-center"
+                >
+                  {loadingFormats ? (
+                    <>
+                      <RefreshCw className="w-5 h-5 animate-spin" />
+                      Cargando...
+                    </>
+                  ) : (
+                    <>
+                      <Video className="w-5 h-5" />
+                      Ver Formatos
+                    </>
+                  )}
+                </button>
+              ) : (
+                <button
+                  onClick={manejarDescarga}
+                  disabled={loading || !selectedFormat}
+                  className="px-8 py-4 bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 disabled:opacity-50 disabled:cursor-not-allowed rounded-xl font-semibold transition-all duration-200 shadow-lg hover:shadow-xl flex items-center gap-2 min-w-[140px] justify-center"
+                >
+                  {loading ? (
+                    <>
+                      <RefreshCw className="w-5 h-5 animate-spin" />
+                      Descargando...
+                    </>
+                  ) : (
+                    <>
+                      <Download className="w-5 h-5" />
+                      Descargar
+                    </>
+                  )}
+                </button>
+              )}
             </div>
           </div>
         </div>
+
+        {/* Formats Selection */}
+        {availableFormats && (
+          <div className="w-full max-w-2xl mb-12">
+            <div className="bg-white/10 backdrop-blur-md rounded-2xl border border-white/20 p-6 shadow-2xl">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-xl font-bold text-white">Seleccionar Formato</h3>
+                <button
+                  onClick={cancelarSeleccion}
+                  className="text-gray-400 hover:text-white transition-colors"
+                >
+                  <AlertCircle className="w-5 h-5" />
+                </button>
+              </div>
+              
+              {videoTitle && (
+                <div className="mb-4 p-3 bg-white/5 rounded-lg">
+                  <p className="text-gray-300 text-sm">Título:</p>
+                  <p className="text-white font-medium truncate">{videoTitle}</p>
+                </div>
+              )}
+
+              <div className="space-y-2 max-h-64 overflow-y-auto">
+                {availableFormats.map((format, index) => (
+                  <label
+                    key={`${format.format_id}-${index}`}
+                    className={`flex items-center justify-between p-4 rounded-lg cursor-pointer transition-all ${
+                      selectedFormat === format.format_id
+                        ? 'bg-blue-500/30 border border-blue-400/50'
+                        : 'bg-white/5 hover:bg-white/10 border border-transparent'
+                    }`}
+                  >
+                    <div className="flex items-center gap-3">
+                      <input
+                        type="radio"
+                        name="format"
+                        value={format.format_id}
+                        checked={selectedFormat === format.format_id}
+                        onChange={(e) => setSelectedFormat(e.target.value)}
+                        className="text-blue-500"
+                      />
+                      <div className="flex items-center gap-2">
+                        {obtenerIconoCalidad(format.resolution)}
+                        <span className="font-medium">
+                          {format.quality_label || `${format.ext.toUpperCase()}`}
+                        </span>
+                      </div>
+                    </div>
+                    
+                    <div className="text-right text-sm text-gray-400">
+                      {format.resolution && (
+                        <div>{format.resolution}</div>
+                      )}
+                      <div className="text-xs">{format.ext.toUpperCase()}</div>
+                    </div>
+                  </label>
+                ))}
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Downloads List */}
         <div className="w-full max-w-4xl">
@@ -259,6 +414,11 @@ function App() {
                             {estadoVisual.icon}
                             <span className="font-medium">{estadoVisual.text}</span>
                           </div>
+                          {d.format && (
+                            <span className="text-xs bg-white/10 px-2 py-1 rounded text-gray-300">
+                              {d.format}
+                            </span>
+                          )}
                         </div>
                         
                         <h3 className="font-semibold text-lg text-white mb-1 truncate">
